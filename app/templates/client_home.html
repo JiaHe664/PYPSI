@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <!-- import CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/element-ui@2.15.10/lib/theme-chalk/index.css">
+  <style>
+    {% comment %} *{
+      margin:0;
+      padding:0;
+    } {% endcomment %}
+    .logo{
+      float:left;
+    }
+    .version{
+      float:right;
+    }
+    .el-header, .el-footer {
+      background-color: #303133;
+      color: #333;
+      text-align: center;
+      line-height: 60px;
+      font-size:20px;
+    }
+    .el-aside {
+      background-color: #D3DCE6;
+      color: #333;
+      text-align: center;
+      line-height: 200px;
+    }
+    
+    .el-main {
+      background-color: #E9EEF3;
+      color: #333;
+      text-align: center;
+      font-size:20px;
+    }
+    body > .el-container {
+      margin-bottom: 40px;
+    }
+    
+    .el-container:nth-child(5) .el-aside,
+    .el-container:nth-child(6) .el-aside {
+      line-height: 260px;
+    }
+    
+    .el-container:nth-child(7) .el-aside {
+      line-height: 320px;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="app">
+    {% load static %}
+    {% comment %} <el-button @click="visible = true">Button</el-button>
+    <el-dialog :visible.sync="visible" title="Hello world">
+      <p>Try Element</p>
+    </el-dialog> {% endcomment %}
+  
+    <el-container>
+
+      <el-header style="height: 80px;">
+        <!-- logo图标 -->
+        <div class="logo">
+          <img src="{% static 'image/logo.png'%}" style="width:80px; height:80px;vertical-align: middle; margin-right:10px;">
+          <strong style="color:#FFFFFF; line-height:60px;">隐私求交平台</strong>
+        </div>
+
+        <!-- 版本标志 -->
+        <div class="version">
+          <img src="{% static 'image/version.svg'%}" style="width:60px; height:60px;vertical-align: middle; margin:10px;">
+          <span style="color:#FFFFFF; line-height:60px;">version 1.0</span>
+        </div>
+      </el-header>
+
+      <el-main style="height:1000px;">
+        <el-tabs type="border-card" tab-position="left" style="height:100%;" strectch>
+          <el-tab-pane>
+            <span slot="label"><i class="el-icon-s-data"></i> 数据目录</span>
+            <template>
+              <el-table
+                :data="nowTableData"
+                style="width:100%;border-bottom:0px;"
+                height="500px"
+                stripe
+                :default-sort="{prop: 'date', order: 'ascending'}">
+                <el-table-column
+                  label="上传日期"
+                  prop="date"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="表名"
+                  prop="name">
+                </el-table-column>
+                <el-table-column
+                  label="记录数"
+                  prop="records"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="关联任务"
+                  prop="task_id"
+                  :show-overflow-tooltip="true">
+                </el-table-column>
+                <el-table-column>
+                  <template slot="header" slot-scope="scope">
+                    <el-input
+                      v-model="table_search"
+                      size="medium"
+                      placeholder="输入关键词进行搜索"
+                      @change="handleSearch(table_search,1)"/>
+                  </template>
+                  <template slot-scope="scope">
+                    <el-button
+                      size="medium"
+                      type="danger"
+                      icon="el-icon-delete"
+                      @click="deleteTable(scope.$index, scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-pagination
+                @size-change="tableSizeChange"
+                @current-change="handleCurrentChange"
+                :page-sizes="[1, 2, 3, 4]"
+                layout="total, sizes, prev, pager, next"
+                :page-size="table_pageSize"
+                :current-page.sync="table_curPage"
+                :total="tableData.length"
+                style="margin-top:50px;">
+              </el-pagination>
+            </template>
+            <el-upload
+              class="upload-demo"
+              drag
+              action="/client/upload"
+              multiple
+              style="margin-top:50px;"
+              :on-success="(response,file,fileList)=>{return upload(response,file,fileList)}">
+              <i class="el-icon-upload"></i>
+              <div class="el-upload__text"><strong><em>点击上传</em>新数据集，支持拖拽上传！</strong></div>
+              <div class="el-upload__tip" slot="tip"><strong>只能上传csv/txt文件，且不超过500kb</strong></div>
+            </el-upload>
+          </el-tab-pane>
+          <el-tab-pane>
+            <span slot="label"><i class="el-icon-s-order"></i> 求交任务</span>
+            <template>
+              <el-table
+                :data="nowTaskData"
+                style="width:100%;border-bottom:0px;"
+                height="500px"
+                stripe
+                :default-sort="{prop: 'date', order: 'ascending'}">
+                <el-table-column
+                  label="创建日期"
+                  prop="date"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="任务ID"
+                  prop="id"
+                  :show-overflow-tooltip="true">
+                </el-table-column>
+                <el-table-column
+                  label="关联表名"
+                  prop="table">
+                </el-table-column>
+                <el-table-column
+                  label="主机地址"
+                  prop="host">
+                </el-table-column>
+                <el-table-column
+                  label="主机端口"
+                  prop="port">
+                </el-table-column>
+                <el-table-column
+                  label="结果数"
+                  prop="results"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="状态"
+                  :filters="[{ text: '成功', value: 1 }, { text: '未启动', value: 0 }, { text: '失败', value: -1 }, { text: '已启动', value: 2 }]"
+                  :filter-method="filterTag">
+                  <template slot-scope="scope">
+                    <el-tag v-if="scope.row.status===0" type="info">未启动</el-tag>
+                    <el-tag v-if="scope.row.status===1" type="success">成功</el-tag>
+                    <el-tag v-if="scope.row.status===-1" type="danger">失败</el-tag>
+                    <el-tag v-if="scope.row.status===2" type="primary">已启动</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  label="耗时（s）"
+                  prop="runtime">
+                </el-table-column>
+                <el-table-column>
+                  <template slot="header" slot-scope="scope">
+                    <el-input
+                      v-model="task_search"
+                      size="medium"
+                      placeholder="输入日期/任务ID/关联表名进行搜索"
+                      @change="handleSearch(task_search, 2)"/>
+                  </template>
+                  <template slot-scope="scope">
+                    <el-button
+                      size="medium"
+                      type="primary"
+                      icon="el-icon-position"
+                      @click="handleStartTask(scope.$index, scope.row)">启动</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-pagination
+                @size-change="taskSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page.sync="task_curPage"
+                :page-sizes="[1, 2, 3, 4]"
+                :page-size="task_pageSize"
+                layout="total, sizes, prev, pager, next"
+                :total="taskData.length"
+                style="margin-top:50px;">
+              </el-pagination>
+            </template>
+            <el-button type="primary" icon="el-icon-circle-plus-outline" style="margin-top:50px;" @click="dialogFormVisible = true">创建新任务</el-button>
+            <el-dialog title="新的集合求交任务" :visible.sync="dialogFormVisible" :model="form" center>
+              <div style="padding:0px 250px;">
+                主机地址：
+                <el-input placeholder="请输入IPv4地址（点分十进制）" v-model="form.host" suffix-icon="el-icon-s-platform" size="medium" style="width:400px;"></el-input>
+                <div style="margin: 20px 0;"></div>
+                主机端口：
+                <el-input placeholder="请输入0～65535范围内未被占用的端口号" v-model="form.port" suffix-icon="el-icon-set-up" size="medium" style="width:400px;"></el-input>
+                <div style="margin: 20px 0;"></div>
+                数据表名：
+                <el-autocomplete
+                  class="inline-input"
+                  v-model="form.table"
+                  :fetch-suggestions="querySearch"
+                  placeholder="请选择/输入已上传的数据表名"
+                  @select="handleSelect"
+                  suffix-icon="el-icon-document"
+                  size="medium"
+                  style="width:400px;"
+                ></el-autocomplete>
+              </div>
+              <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button type="primary" @click="createTask()">确 定</el-button>
+              </div>
+            </el-dialog>
+          </el-tab-pane>
+          <el-tab-pane>
+            <span slot="label"><i class="el-icon-info"></i> 求交结果</span>
+            <template>
+              <el-table
+                :data="nowResultData"
+                style="width:100%;border-bottom:0px;"
+                height="500px"
+                stripe
+                :default-sort="{prop: 'date', order: 'ascending'}">
+                <el-table-column
+                  label="日期"
+                  prop="date"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="表名"
+                  prop="name">
+                </el-table-column>
+                <el-table-column
+                  label="结果数"
+                  prop="records"
+                  sortable>
+                </el-table-column>
+                <el-table-column
+                  label="关联任务"
+                  prop="task_id"
+                  :show-overflow-tooltip="true">
+                </el-table-column>
+                <el-table-column>
+                  <template slot="header" slot-scope="scope">
+                    <el-input
+                      v-model="result_search"
+                      size="medium"
+                      placeholder="输入关键词进行搜索"
+                      @change="handleSearch(table_search,1)"/>
+                  </template>
+                  <template slot-scope="scope">
+                    <el-link targer="_blank" :href="`/download?id=${scope.row.name}`">
+                    </el-link>
+                    <el-button
+                      size="medium"
+                      type="primary"
+                      icon="el-icon-download"
+                      @click="download(scope.$index, scope.row)">下载</el-button>
+                    <el-button
+                    size="medium"
+                    type="primary"
+                    icon="el-icon-view"
+                    @click="showDetails(scope.$index, scope.row)">查看详情</el-button>
+                    <el-button
+                    size="medium"
+                    type="danger"
+                    icon="el-icon-delete"
+                    @click="deleteResult(scope.$index, scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-pagination
+                @size-change="resultSizeChange"
+                @current-change="handleCurrentChange"
+                :page-sizes="[1, 2, 3, 4]"
+                layout="total, sizes, prev, pager, next"
+                :page-size="result_pageSize"
+                :current-page.sync="result_curPage"
+                :total="resultData.length"
+                style="margin-top:50px;">
+              </el-pagination>
+            </template>
+            <el-dialog title="检测报告" :visible.sync="dialogDetailsVisible" center>
+              <el-collapse accordion>
+                <el-collapse-item>
+                  <template slot="title">
+                    已泄漏的密码<i class="header-icon el-icon-warning"></i>
+                  </template>
+                  <template>
+                    <el-table
+                      :data="intersections"
+                      height="350"
+                      stripe
+                      :show-header="false"
+                      style="width: 100%;">
+                      <el-table-column
+                        prop="pwd"
+                        label="密码"
+                        align="center">
+                      </el-table-column>
+                    </el-table>
+                  </template>
+                </el-collapse-item>
+                <el-collapse-item>
+                  <template slot="title">
+                    未泄漏的密码<i class="header-icon el-icon-success"></i>
+                  </template>
+                  <template>
+                    <el-table
+                      :data="differences"
+                      height="350"
+                      stripe
+                      :show-header="false"
+                      style="width: 100%;">
+                      <el-table-column
+                        prop="pwd"
+                        label="密码"
+                        align="center">
+                      </el-table-column>
+                    </el-table>
+                  </template>
+                </el-collapse-item>
+              </el-collapse>
+              {% comment %} <div style="padding:0px 250px;">
+              </div> {% endcomment %}
+              <div slot="footer" class="dialog-footer">
+                <el-button type="primary" @click="dialogDetailsVisible = false">确 定</el-button>
+              </div>
+            </el-dialog>
+          </el-tab-pane>
+        </el-tabs>
+      </el-main>
+      <el-footer style="height: 80px;">Footer</el-footer>
+    </el-container>
+  </div>
+</body>
+
+
+  <!-- import Vue before Element -->
+  <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+  <!-- import JavaScript -->
+  <script src="https://unpkg.com/element-ui@2.15.10/lib/index.js"></script>
+  <!-- import md5 js -->
+  <script src="https://cdn.bootcss.com/blueimp-md5/2.10.0/js/md5.min.js"></script>
+  <!-- import axios -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script>
+
+    new Vue({
+      el: '#app',
+      data: function() {
+        return {
+          tableData: [],
+          taskData:[],
+          resultData: [],
+          table_curPage: 1,
+          task_curPage:1,
+          result_curPage:1,
+          table_search: '',
+          task_search:'',
+          result_search:'',
+          table_pageSize:4,
+          task_pageSize:4,
+          result_pageSize:4,
+          dialogFormVisible: false,
+          form: {
+            host: '',
+            port: '',
+            monitor: '',
+            table: '',
+          },
+          formLabelWidth: '120px',
+          dialogFormVisible:false,
+          dialogDetailsVisible:false,
+          intersections:[],
+          differences:[]
+        }
+      },
+      computed: {
+          nowTableData() {
+              return this.tableData.slice( (this.table_curPage -1) * this.table_pageSize, this.table_curPage * this.table_pageSize) || [];
+          },
+          nowTaskData() {
+            return this.taskData.slice( (this.task_curPage -1) * this.task_pageSize, this.task_curPage * this.task_pageSize) || [];
+          },
+          nowResultData() {
+            return this.resultData.slice( (this.result_curPage -1) * this.result_pageSize, this.result_curPage * this.result_pageSize) || [];
+          },
+      },
+      mounted(){
+        // 获取后端数据
+        this.loadTable(),
+        this.loadTask(),
+        this.loadResult()
+      },
+      methods: {
+        loadTable(){
+          // 获取后端Table数据
+          axios({
+              method: "GET", // 如果是get方法，则写“GET”
+              url: "client/loadTable",
+              dataType:'json'
+          })
+              .then(res => {
+                this.tableData = []
+                var tables = JSON.parse(res.data['table']);
+                for(let i = 0;i<tables.length;i++){
+                  var data = {}
+                  data['date'] = tables[i]['fields']['date']
+                  data['name'] = tables[i]['fields']['name']
+                  data['records'] = tables[i]['fields']['records']
+                  data['task_id'] = tables[i]['fields']['task_id']
+                  this.tableData.push(data)
+                }
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+        loadTask(){
+          // 获取后端Table数据
+          axios({
+              method: "GET", // 如果是get方法，则写“GET”
+              url: "client/loadTask",
+              dataType:'json'
+          })
+              .then(res => {
+                this.taskData = []
+                tables = JSON.parse(res.data['task'])
+                for(let i = 0;i<tables.length;i++){  
+                  var data = {}
+                  data['date'] = tables[i]['fields']['date']
+                  data['id'] = tables[i]['fields']['label']
+                  data['table'] = tables[i]['fields']['table']
+                  data['host'] = tables[i]['fields']['host']
+                  data['port'] = tables[i]['fields']['port']
+                  data['results'] = tables[i]['fields']['results']
+                  data['runtime'] = tables[i]['fields']['runtime']
+                  data['status'] = tables[i]['fields']['status']
+                  this.taskData.push(data)
+                }
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+        loadResult(){
+          // 获取后端Table数据
+          axios({
+              method: "GET", // 如果是get方法，则写“GET”
+              url: "client/loadResult",
+              dataType:'json'
+          })
+              .then(res => {
+                this.resultData = []
+                tables = JSON.parse(res.data['result'])
+                for(let i = 0;i<tables.length;i++){
+                  var data = {}
+                  data['date'] = tables[i]['fields']['date']
+                  data['name'] = tables[i]['fields']['name']
+                  data['records'] = tables[i]['fields']['records']
+                  data['task_id'] = tables[i]['fields']['task_id']
+                  this.resultData.push(data)
+                }
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+        showDetails(index,row){
+          // 获取后端Table数据
+          if(this.intersections.length == 0){
+            axios({
+              method: "POST", // 如果是get方法，则写“GET”
+              url: "client/showDetails",
+              data:{
+                'id':row.task_id,
+                'table':row.name  
+              }
+          })
+              .then(res => {
+                this.intersections = res['data']['intersections']
+                this.differences = res['data']['differences']
+              })
+              .catch(err => {
+                console.log(err)
+              });
+          }
+          this.dialogDetailsVisible = true
+        },
+        async deleteTable(index, row) {
+          // 弹框询问用户是否删除数据
+          const confirmResult = await this.$confirm('此操作将永久删除该数据表, 是否继续?', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).catch(() => {
+            this.$message({
+              type: 'info',
+              message: '已取消删除'
+            })
+          })
+
+          // 如果用户确认删除，则返回值为字符串 confirm
+          // 如果用户取消删除，则返回值为字符串 cancel
+          if (confirmResult == 'confirm') {
+            this.tableData.splice(index,1)
+            // 发起删除数据表的数据请求
+            axios({
+                method: "GET", // 如果是get方法，则写“GET”
+                url: "client/deleteTable/" + row.name,
+            })
+                .then(res => {
+                  // 提示删除成功
+                  this.$message.success('已成功删除数据表' + row.name)
+                })
+                .catch(err => {
+                  console.log(err)
+                });
+          }
+        },
+        async deleteResult(index, row) {
+          // 弹框询问用户是否删除交集结果
+          const confirmResult = await this.$confirm('此操作将永久删除该数据表, 是否继续?', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).catch(() => {
+            this.$message({
+              type: 'info',
+              message: '已取消删除'
+            })
+          })
+
+          // 如果用户确认删除，则返回值为字符串 confirm
+          // 如果用户取消删除，则返回值为字符串 cancel
+          if (confirmResult == 'confirm') {
+            this.resultData.splice(index,1)
+            // 发起删除数据表的数据请求
+            axios({
+                method: "GET", // 如果是get方法，则写“GET”
+                url: "client/deleteResult/" + row.name,
+            })
+                .then(res => {
+                  // 提示删除成功
+                  this.$message.success('已成功删除数据表' + row.name)
+                })
+                .catch(err => {
+                  console.log(err)
+                });
+          }
+        },
+        tableSizeChange(val) {
+          this.table_pageSize = val;
+        },
+        taskSizeChange(val) {
+          this.task_pageSize = val;
+        },
+        resultSizeChange(val) {
+          this.result_pageSize = val;
+        },
+        handleCurrentChange(val) {
+          console.log(`当前页: ${val}`);
+        },
+        handleStartTask(index,row){
+          var task = {}
+          task['id'] = row.id
+          task['table'] = row.table
+          task['host'] = row.host
+          task['port'] = row.port
+          // 提示启动任务成功
+          this.$message.info('已成功启动任务'+row.id)
+          row.status = 2
+          axios({
+            method: "POST", // 如果是get方法，则写“GET”
+            url: "server/startTask",
+            data: task
+        })
+            .then(res => {
+            })
+            .catch(err => {
+              console.log(err)
+            });
+
+          axios({
+              method: "POST", // 如果是get方法，则写“GET”
+              url: "client/startTask",
+              data: task,
+          })
+              .then(res => {
+                this.$message.success('已成功结束任务'+row.id)
+                this.loadTask()
+                this.loadResult()
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+        handleSearch(search, flag){
+          if(search){
+            if(flag == 1){
+              let result = this.tableData.filter(row => {
+                return row.name.indexOf(search) > -1 
+                  || row.date.indexOf(search) > -1 
+                  || row.task_id.indexOf(search) > -1;
+              });
+              this.tableData = result ; //把搜索出来的展示出来
+            }
+            else if(flag == 2){
+              let result = this.taskData.filter(row => {
+                return row.date.indexOf(search) > -1 
+                  || row.id.indexOf(search) > -1 
+                  || row.table.indexOf(search) > -1;
+              });
+              this.taskData = result ; //把搜索出来的展示出来
+            }
+            else{
+              pass
+            }
+          }
+        },
+        filterTag(value, row) {
+          return row.status === value;
+        },
+        querySearch(queryString, cb) {
+          var tableData = this.tableData;
+          table_names = []
+          for(let i = 0;i<tableData.length;i++){
+            dic = {}
+            dic['value'] =  tableData[i].name
+            table_names[i] = dic
+          }
+          var results = queryString ? table_names.filter(this.createFilter(queryString)) : table_names;
+          // 调用 callback 返回建议列表的数据
+          cb(results);
+        },
+        createFilter(queryString) {
+          return (data) => {
+            return (data.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+          };
+        },
+        handleSelect(item) {
+          console.log(this.form.table)
+          console.log(item);
+        },
+        async createTask(){
+          var task = {}
+          var now = new Date()
+          var year=now.getFullYear();      
+          var month=now.getMonth()+1;      
+          var day=now.getDate();     
+          task['date'] = year + '-' + month + '-' + day
+          task['id'] = md5(now.toGMTString())
+          task['table'] = this.form.table
+          task['results'] = 0
+          task['runtime'] = 0
+          task['status'] = 0
+          task['host'] = this.form.host
+          task['port'] = this.form.port
+          axios({
+              method: "POST", // 如果是get方法，则写“GET”
+              url: "client/createTask",
+              data: task,
+          })
+              .then(res => {
+                // 提示创建任务成功
+                this.taskData.push(task)
+                this.loadTable()
+                this.dialogFormVisible = false
+                this.$message.success('已成功创建任务' + task['id'])
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+        upload(res, file, fileList){
+          console.log(res)
+          this.tableData.push(res) 
+          this.$message.success("已成功上传文件" + file.name)
+        },
+        download(index, row){
+          axios({
+              method: "GET", // 如果是get方法，则写“GET”
+              url: "client/download/" + row.name,
+              responseType: "blob"
+          })
+              .then(res => {
+                  let blob = new Blob([res.data], {
+                      type: "text/plain" //这里需要根据不同的文件格式写不同的参数
+                  });
+
+                  let eLink = document.createElement("a");
+                  eLink.download = row.name; //这里需要自己给下载的文件命名
+                  eLink.style.display = "none";
+                  eLink.href = URL.createObjectURL(blob);
+                  document.body.appendChild(eLink);
+                  eLink.click();
+                  URL.revokeObjectURL(eLink.href);
+                  document.body.removeChild(eLink);
+                  this.$message.success("已成功下载文件" + row.name)
+              })
+              .catch(err => {
+                console.log(err)
+              });
+        },
+      },
+
+    })
+  </script>
+</html>
